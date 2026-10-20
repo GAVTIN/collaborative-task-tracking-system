@@ -1,0 +1,24 @@
+# dependencies
+node_modules/
+
+# secrets and local configuration
+.env
+.env.*
+!.env.example
+
+# runtime data: database files and user uploads
+data/
+uploads/*
+!uploads/.gitkeep
+
+# logs and OS / editor noise
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# build / release artefacts
+*.zip
+coverage/
