@@ -172,6 +172,7 @@ task-tracker-api/
 ├── scripts/                   # migrate.js, seed.js
 ├── docs/requests.http         # every endpoint, ready to click in VS Code
 ├── .env.example
+├── .npmrc                     # ignore-scripts=true: stops npm compiling better-sqlite3 (see Troubleshooting)
 └── uploads/                   # attachment bytes (git-ignored)
 ```
 
@@ -762,7 +763,8 @@ is in any file. In the repository's *Settings → General → Danger Zone* confi
 
 | Symptom | Fix |
 |---------|-----|
-| `npm install` fails on `better-sqlite3` or reports an unsupported engine | Upgrade to Node 22 or newer (`node -v`). On a supported Node a prebuilt binary is downloaded; if none exists for your platform, install a C++ build toolchain (on Windows: *Visual Studio Build Tools*, "Desktop development with C++") |
+| `npm install` reports an unsupported engine | Upgrade to Node 22 or newer (`node -v`) |
+| `npm install` fails with `node-gyp` / "gyp ERR!" errors on `better-sqlite3` | Make sure the project's [`.npmrc`](.npmrc) is present (it contains `ignore-scripts=true`). `better-sqlite3` bundles ready-made binaries for Windows, macOS and Linux (x64 and arm64), so nothing needs compiling; npm only tries to compile it when that setting is missing. Only on a platform without a bundled binary (e.g. 32-bit ARM) should you remove that line and install a C++ toolchain (on Windows: *Visual Studio Build Tools*, "Desktop development with C++") |
 | `JWT_SECRET is required in production` | Set a 32+ character `JWT_SECRET` in the environment |
 | Everyone is logged out after each restart | You have no `JWT_SECRET` set in development (a random one is generated every run). Set it in `.env` |
 | `EADDRINUSE` | Port 3000 is taken: set `PORT=3001` in `.env` |
