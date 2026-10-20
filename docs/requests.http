@@ -1,0 +1,385 @@
+### =============================================================================
+### Task Tracker API - every endpoint, ready to run
+###
+### How to use: install the free "REST Client" extension in VS Code, open this file,
+### and click "Send Request" above any request. Run them top to bottom the first time:
+### later requests reuse values (token, ids) captured from earlier responses.
+###
+### Start the server first (npm start). For demo data run `npm run seed` once.
+### =============================================================================
+
+@baseUrl = http://localhost:3000/api
+
+
+### ----------------------------------------------------------------------------
+### 1. AUTHENTICATION
+### ----------------------------------------------------------------------------
+
+### Register a new account  (user story 1)
+# @name register
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "name": "Dana Demo",
+  "email": "dana@example.com",
+  "password": "Password123"
+}
+
+### Log in  (user story 2). Change the e-mail to alice@example.com after `npm run seed` for richer data.
+# @name login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "dana@example.com",
+  "password": "Password123"
+}
+
+### The token from the login response is reused by every request below
+@token = {{login.response.body.data.token}}
+
+
+### ----------------------------------------------------------------------------
+### 2. PROFILE  (user story 3)
+### ----------------------------------------------------------------------------
+
+### View my profile
+GET {{baseUrl}}/users/me
+Authorization: Bearer {{token}}
+
+### Update my profile (any subset of name / jobTitle / bio; null clears jobTitle and bio)
+PATCH {{baseUrl}}/users/me
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Dana Demo",
+  "jobTitle": "Product Manager",
+  "bio": "I like tidy backlogs."
+}
+
+### Change password (signs out every other session and returns a fresh token)
+# PUT {{baseUrl}}/users/me/password
+# Authorization: Bearer {{token}}
+# Content-Type: application/json
+#
+# { "currentPassword": "Password123", "newPassword": "EvenBetter456" }
+
+
+### ----------------------------------------------------------------------------
+### 3. TEAMS AND INVITATIONS  (user story 11)
+### ----------------------------------------------------------------------------
+
+### Create a team (I become its owner)
+# @name createTeam
+POST {{baseUrl}}/teams
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Launch Squad",
+  "description": "Everything for the October launch"
+}
+
+@teamId = {{createTeam.response.body.data.id}}
+
+### List my teams
+GET {{baseUrl}}/teams
+Authorization: Bearer {{token}}
+
+### Team details
+GET {{baseUrl}}/teams/{{teamId}}
+Authorization: Bearer {{token}}
+
+### Rename the team (owner or admin)
+PATCH {{baseUrl}}/teams/{{teamId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "name": "Launch Squad 2.0" }
+
+### Invite someone by e-mail. The response contains the invitation `token` to share with them.
+# @name invite
+POST {{baseUrl}}/teams/{{teamId}}/invites
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "email": "bob@example.com",
+  "role": "member"
+}
+
+@inviteToken = {{invite.response.body.data.token}}
+@inviteId = {{invite.response.body.data.id}}
+
+### Pending invitations for the team (owner/admin)
+GET {{baseUrl}}/teams/{{teamId}}/invites
+Authorization: Bearer {{token}}
+
+### Revoke an invitation
+# DELETE {{baseUrl}}/teams/{{teamId}}/invites/{{inviteId}}
+# Authorization: Bearer {{token}}
+
+### --- The invitee's side: log in as bob (after `npm run seed`), then see and answer the invitation ---
+
+# @name bobLogin
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{ "email": "bob@example.com", "password": "Password123" }
+
+@bobToken = {{bobLogin.response.body.data.token}}
+
+### Invitations addressed to me
+GET {{baseUrl}}/invites
+Authorization: Bearer {{bobToken}}
+
+### Accept (only the invited e-mail address can do this)
+POST {{baseUrl}}/invites/{{inviteToken}}/accept
+Authorization: Bearer {{bobToken}}
+
+### Decline instead
+# POST {{baseUrl}}/invites/{{inviteToken}}/decline
+# Authorization: Bearer {{bobToken}}
+
+### Team members
+GET {{baseUrl}}/teams/{{teamId}}/members
+Authorization: Bearer {{token}}
+
+### Promote a member to admin (owner only). Replace 2 with the member's user id.
+# PATCH {{baseUrl}}/teams/{{teamId}}/members/2
+# Authorization: Bearer {{token}}
+# Content-Type: application/json
+#
+# { "role": "admin" }
+
+### Remove a member, or leave the team yourself (the owner cannot leave)
+# DELETE {{baseUrl}}/teams/{{teamId}}/members/2
+# Authorization: Bearer {{token}}
+
+
+### ----------------------------------------------------------------------------
+### 4. TASKS  (user stories 4 - 9)
+### ----------------------------------------------------------------------------
+
+### Create a personal task  (user story 4)
+# @name createPersonal
+POST {{baseUrl}}/tasks
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "Write the launch checklist",
+  "description": "Cover QA, comms and rollback.",
+  "dueDate": "2026-11-15",
+  "priority": "high"
+}
+
+@personalTaskId = {{createPersonal.response.body.data.id}}
+
+### Create a team task and assign it to a teammate  (user stories 4 and 7)
+# @name createTeamTask
+POST {{baseUrl}}/tasks
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "Prepare press kit",
+  "description": "Logos, screenshots and a one-pager.",
+  "dueDate": "2026-11-01T17:30:00+05:30",
+  "teamId": {{teamId}},
+  "assigneeId": 2
+}
+
+@taskId = {{createTeamTask.response.body.data.id}}
+
+### Create a task and let the AI draft the description  (user story 14)
+POST {{baseUrl}}/tasks
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "Migrate billing to Stripe",
+  "generateDescription": true
+}
+
+### One task
+GET {{baseUrl}}/tasks/{{taskId}}
+Authorization: Bearer {{token}}
+
+### Tasks assigned to me  (user story 5)
+GET {{baseUrl}}/tasks?assignee=me
+Authorization: Bearer {{token}}
+
+### Filter by status  (user story 8). Several values allowed: open,in_progress
+GET {{baseUrl}}/tasks?status=open,in_progress
+Authorization: Bearer {{token}}
+
+### Search title and description  (user story 9)
+GET {{baseUrl}}/tasks?q=press
+Authorization: Bearer {{token}}
+
+### Combine everything: my open high-priority tasks, soonest due first, 10 per page
+GET {{baseUrl}}/tasks?assignee=me&status=open&priority=high&sortBy=dueDate&order=asc&page=1&limit=10
+Authorization: Bearer {{token}}
+
+### What is overdue?
+GET {{baseUrl}}/tasks?overdue=true
+Authorization: Bearer {{token}}
+
+### Only personal tasks / only one team
+GET {{baseUrl}}/tasks?teamId=personal
+Authorization: Bearer {{token}}
+
+###
+GET {{baseUrl}}/tasks?teamId={{teamId}}
+Authorization: Bearer {{token}}
+
+### Partial update
+PATCH {{baseUrl}}/tasks/{{taskId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "status": "in_progress",
+  "priority": "high"
+}
+
+### Assign (or reassign) to a teammate  (user story 7). Use { "assigneeId": null } to unassign.
+PUT {{baseUrl}}/tasks/{{taskId}}/assignee
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "assigneeId": 2 }
+
+### Mark as completed  (user story 6)
+POST {{baseUrl}}/tasks/{{taskId}}/complete
+Authorization: Bearer {{token}}
+
+### Delete a task (creator, or team owner/admin)
+# DELETE {{baseUrl}}/tasks/{{personalTaskId}}
+# Authorization: Bearer {{token}}
+
+
+### ----------------------------------------------------------------------------
+### 5. COMMENTS  (user story 10)
+### ----------------------------------------------------------------------------
+
+### Add a comment
+# @name comment
+POST {{baseUrl}}/tasks/{{taskId}}/comments
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "body": "Draft is ready for review." }
+
+@commentId = {{comment.response.body.data.id}}
+
+### List comments (oldest first)
+GET {{baseUrl}}/tasks/{{taskId}}/comments
+Authorization: Bearer {{token}}
+
+### Edit my comment (author only)
+PATCH {{baseUrl}}/tasks/{{taskId}}/comments/{{commentId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "body": "Draft is ready for review - link in the thread." }
+
+### Delete a comment (author, or team owner/admin)
+# DELETE {{baseUrl}}/tasks/{{taskId}}/comments/{{commentId}}
+# Authorization: Bearer {{token}}
+
+
+### ----------------------------------------------------------------------------
+### 6. ATTACHMENTS  (user story 10)
+### ----------------------------------------------------------------------------
+
+### Upload a file (multipart, field name must be "file")
+# @name upload
+POST {{baseUrl}}/tasks/{{taskId}}/attachments
+Authorization: Bearer {{token}}
+Content-Type: multipart/form-data; boundary=----TaskTrackerBoundary
+
+------TaskTrackerBoundary
+Content-Disposition: form-data; name="file"; filename="notes.txt"
+Content-Type: text/plain
+
+These are my meeting notes.
+------TaskTrackerBoundary--
+
+@attachmentId = {{upload.response.body.data.id}}
+
+### List attachments
+GET {{baseUrl}}/tasks/{{taskId}}/attachments
+Authorization: Bearer {{token}}
+
+### Download
+GET {{baseUrl}}/tasks/{{taskId}}/attachments/{{attachmentId}}/download
+Authorization: Bearer {{token}}
+
+### Delete an attachment
+# DELETE {{baseUrl}}/tasks/{{taskId}}/attachments/{{attachmentId}}
+# Authorization: Bearer {{token}}
+
+
+### ----------------------------------------------------------------------------
+### 7. NOTIFICATIONS  (user story 13)
+### ----------------------------------------------------------------------------
+
+### Inbox (add ?unread=true to filter)
+GET {{baseUrl}}/notifications
+Authorization: Bearer {{token}}
+
+### Unread count
+GET {{baseUrl}}/notifications/unread-count
+Authorization: Bearer {{token}}
+
+### Mark one as read
+# PATCH {{baseUrl}}/notifications/1/read
+# Authorization: Bearer {{token}}
+
+### Mark everything as read
+POST {{baseUrl}}/notifications/read-all
+Authorization: Bearer {{token}}
+
+### One-time ticket for browser EventSource clients (valid 30 s, single use)
+POST {{baseUrl}}/notifications/stream-ticket
+Authorization: Bearer {{token}}
+
+### Live stream. The REST Client extension shows events as they arrive; assign a task to this user
+### from another session and watch it appear. (From a terminal: curl -N <url> -H "Authorization: Bearer <token>")
+GET {{baseUrl}}/notifications/stream
+Authorization: Bearer {{bobToken}}
+
+
+### ----------------------------------------------------------------------------
+### 8. GENERATIVE AI  (user story 14) - works offline with the built-in template provider
+### ----------------------------------------------------------------------------
+
+### Draft a description from a title
+POST {{baseUrl}}/ai/task-description
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "Add dark mode to the dashboard",
+  "context": "Users have asked for it in three support tickets."
+}
+
+### Summarise a task and its comments
+POST {{baseUrl}}/ai/tasks/{{taskId}}/summary
+Authorization: Bearer {{token}}
+
+
+### ----------------------------------------------------------------------------
+### 9. LOGOUT  (user story 12) and HEALTH
+### ----------------------------------------------------------------------------
+
+### Log out: this token stops working immediately (the next call with it returns 401 TOKEN_REVOKED)
+POST {{baseUrl}}/auth/logout
+Authorization: Bearer {{token}}
+
+### Health check (no authentication)
+GET http://localhost:3000/health
